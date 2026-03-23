@@ -67,7 +67,7 @@ export default function DecksPage() {
 
             <Link
               href="/"
-              className="rounded-lg bg-white px-4 py-2 shadow hover:bg-gray-50"
+              className="rounded-lg bg-gray-800 px-4 py-2 text-white shadow hover:bg-gray-900"
             >
               Home
             </Link>
