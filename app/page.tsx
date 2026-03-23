@@ -26,22 +26,6 @@ export default function Home() {
           >
             Create Deck
           </Link>
-
-          <Link
-            href="/decks/basics"
-            className="rounded-xl border border-gray-400 bg-gray-200 px-6 py-4 text-center text-lg font-medium text-gray-900"
-          >
-            Start Studying
-          </Link>
-        </div>
-
-        <div className="mt-8 border-t pt-6 text-center">
-          <p className="mb-3 text-sm text-gray-500">Direct links for testing</p>
-          <div className="flex flex-wrap justify-center gap-4 text-blue-600 underline">
-            <Link href="/decks">/decks</Link>
-            <Link href="/create">/create</Link>
-            <Link href="/decks/basics">/decks/basics</Link>
-          </div>
         </div>
       </div>
     </main>
