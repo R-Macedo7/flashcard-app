@@ -1,144 +1,190 @@
 "use client";
 
-import Link from "next/link";
-import { notFound, useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import type { Deck } from "@/lib/decks";
-import { getDeckByIdFromSupabase } from "@/lib/supabase-decks";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
+import Link from "next/link"; // Added this import
 
-export default function DeckStudyPage() {
+export default function StudyPage() {
   const params = useParams();
+  const id = params?.id as string;
+  const router = useRouter();
 
-  const id = useMemo(() => {
-    const raw = params?.id;
-    if (typeof raw === "string") return raw;
-    if (Array.isArray(raw)) return raw[0];
-    return undefined;
-  }, [params]);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  const [deck, setDeck] = useState<Deck | null>(null);
+  const [cards, setCards] = useState<any[]>([]);
+  const [deckName, setDeckName] = useState("");
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [flipped, setFlipped] = useState(false);
-  const [index, setIndex] = useState(0);
 
+  // 1. Load Data
   useEffect(() => {
-    if (!id) {
+    async function loadDeck() {
+      if (!id) return;
+      const { data: deckData } = await supabase.from("decks").select("name").eq("id", id).single();
+      const { data: cardData } = await supabase.from("cards").select("*").eq("deck_id", id);
+      if (deckData) setDeckName(deckData.name);
+      if (cardData) setCards(cardData);
       setLoading(false);
-      return;
     }
+    loadDeck();
+  }, [id, supabase]);
 
-    getDeckByIdFromSupabase(id)
-      .then((foundDeck) => {
-        setDeck(foundDeck);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error("Failed to load study deck:", error);
-        setLoading(false);
-      });
-  }, [id]);
+  // 2. Portuguese Pronunciation Function
+  const speak = useCallback((text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel(); // Stop current speech before starting new one
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find(v => v.lang === 'pt-PT') || voices.find(v => v.lang.includes('pt'));
+    
+    if (ptVoice) utterance.voice = ptVoice;
+    utterance.lang = 'pt-PT';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  }, []);
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-100">
-        <p className="text-lg text-gray-700">Loading deck...</p>
-      </main>
-    );
-  }
+  // 3. Navigation
+  const handleNext = useCallback(() => {
+    setIsFlipped(false);
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % cards.length);
+    }, 150);
+  }, [cards.length]);
 
-  if (!deck) {
-    notFound();
-  }
+  const handlePrevious = useCallback(() => {
+    setIsFlipped(false);
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
+    }, 150);
+  }, [cards.length]);
 
-  const currentDeck = deck as Deck;
-  const currentCard = currentDeck.cards[index];
+  const toggleFlip = useCallback(() => {
+    setIsFlipped((prev) => !prev);
+  }, []);
 
-  function nextCard() {
-    setFlipped(false);
-    setIndex((prev) => (prev + 1) % currentDeck.cards.length);
-  }
+  // 4. Keyboard Listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleFlip();
+      } else if (e.key === "ArrowRight") {
+        handleNext();
+      } else if (e.key === "ArrowLeft") {
+        handlePrevious();
+      } else if (e.key === "v" || e.key === "V") {
+        speak(cards[currentIndex]?.pt);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNext, handlePrevious, toggleFlip, speak, cards, currentIndex]);
 
-  function flipCard() {
-    setFlipped((prev) => !prev);
-  }
+  if (loading) return <div className="p-20 text-center font-black text-gray-300 animate-pulse uppercase tracking-widest">A Carregar...</div>;
+  if (cards.length === 0) return <div className="p-20 text-center font-bold text-gray-400">Deck is empty.</div>;
+
+  const currentCard = cards[currentIndex];
 
   return (
-    <main className="min-h-screen bg-gray-100 px-6 py-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6 flex items-center justify-between">
-          <Link
-            href="/decks"
-            className="rounded-lg bg-white px-4 py-2 text-gray-800 shadow hover:bg-gray-50"
+    <main className="min-h-screen bg-white py-12 px-6">
+      <div className="max-w-2xl mx-auto">
+        
+        {/* TOP NAVIGATION BAR (Added Exit Button here) */}
+        <div className="mb-10 flex items-center justify-between">
+          <Link 
+            href="/decks" 
+            className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-500 shadow-sm border border-gray-100 hover:text-purple-600 transition-colors"
           >
-            Back
+            ← Exit
           </Link>
+          
+          <div className="text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-400 mb-2">{deckName}</p>
+            <div className="h-1.5 w-32 bg-gray-100 mx-auto rounded-full overflow-hidden">
+               <div 
+                 className="h-full bg-black transition-all duration-500" 
+                 style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }}
+               />
+            </div>
+          </div>
 
-          <p className="text-base font-semibold text-gray-800">
-            {currentDeck.title}
-          </p>
+          {/* Empty div to keep the deck name perfectly centered */}
+          <div className="w-20 hidden md:block"></div>
         </div>
 
-        <div
-          onClick={flipCard}
-          className="flex min-h-[420px] cursor-pointer items-center justify-center rounded-3xl bg-white p-10 text-center shadow-lg"
-        >
-          {!flipped ? (
-            <div className="w-full">
-              <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-                Portuguese
-              </p>
-              <h2 className="text-5xl font-bold text-gray-900">
+        {/* Card Component */}
+        <div onClick={toggleFlip} className="relative h-96 w-full cursor-pointer perspective-1000">
+          <div className={`relative h-full w-full transition-all duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+            
+            {/* FRONT SIDE (Portuguese) */}
+            <div 
+              className="absolute inset-0 flex flex-col items-center justify-center rounded-[3rem] bg-gray-50 border-2 border-gray-100 shadow-sm backface-hidden p-12 z-20 text-center"
+              style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+            >
+              <button 
+                onClick={(e) => { e.stopPropagation(); speak(currentCard.pt); }}
+                className="mb-6 p-4 rounded-full bg-white shadow-md hover:scale-110 transition-transform text-2xl border border-gray-100"
+              >
+                🔊
+              </button>
+              <h2 className="text-5xl font-black text-gray-900 tracking-tighter leading-tight">
                 {currentCard.pt}
               </h2>
+              <span className="mt-8 text-[9px] font-bold text-gray-300 uppercase tracking-widest">Tap to flip or press Space</span>
             </div>
-          ) : (
-            <div className="w-full">
-              <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-green-700">
-                English
-              </p>
 
-              <h2 className="mb-6 text-4xl font-bold text-gray-900">
+            {/* BACK SIDE (English) */}
+            <div 
+              className="absolute inset-0 flex flex-col items-center justify-center rounded-[3rem] bg-white border-4 border-gray-900 shadow-2xl backface-hidden rotate-y-180 p-12 z-10 text-center"
+              style={{ 
+                backfaceVisibility: 'hidden', 
+                WebkitBackfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)' 
+              }}
+            >
+              <h2 className="text-4xl font-black text-gray-900 tracking-tight leading-tight uppercase">
                 {currentCard.en}
               </h2>
-
-              <div className="rounded-2xl bg-gray-50 p-5 text-left">
-                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  Example in Portuguese
-                </p>
-                <p className="mb-5 text-xl text-gray-900">
-                  {currentCard.example_pt || "—"}
-                </p>
-
-                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  English translation
-                </p>
-                <p className="text-lg text-gray-700">
-                  {currentCard.example_en || "—"}
-                </p>
-              </div>
+              
+              {currentCard.example_pt && (
+                <div className="mt-8 pt-8 border-t border-gray-100 w-full text-center">
+                  <p className="text-lg text-gray-600 font-medium italic mb-2 leading-relaxed">
+                    "{currentCard.example_pt}"
+                  </p>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">
+                    {currentCard.example_en}
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+
+          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4">
-          <button
-            onClick={flipCard}
-            className="rounded-2xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white hover:bg-blue-700"
-          >
-            {flipped ? "Show Portuguese" : "Flip Card"}
+        {/* Controls */}
+        <div className="mt-12 flex items-center justify-center gap-4 max-w-sm mx-auto">
+          <button onClick={handlePrevious} className="flex-1 py-4 bg-gray-50 rounded-2xl text-gray-400 font-black text-xs hover:bg-gray-100 transition-all active:scale-95 uppercase tracking-widest">
+            Prev
           </button>
-
-          <button
-            onClick={nextCard}
-            className="rounded-2xl bg-gray-800 px-6 py-4 text-lg font-semibold text-white hover:bg-gray-900"
-          >
-            Next Card
+          <button onClick={handleNext} className="flex-1 py-4 bg-gray-900 rounded-2xl text-white font-black text-xs hover:bg-black transition-all shadow-lg active:scale-95 uppercase tracking-widest">
+            Next
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xl font-medium text-gray-700">
-          Card {index + 1} of {currentDeck.cards.length}
-        </p>
+        <div className="mt-10 flex justify-center gap-8 text-[9px] font-black text-gray-300 uppercase tracking-[0.2em]">
+          <span className="flex items-center gap-2">
+            <kbd className="bg-gray-100 px-2 py-1 rounded text-gray-400">V</kbd> Pronounce
+          </span>
+          <span className="flex items-center gap-2 text-gray-400">
+             {currentIndex + 1} / {cards.length} Cards
+          </span>
+        </div>
       </div>
     </main>
   );

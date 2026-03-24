@@ -1,131 +1,123 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Deck } from "@/lib/decks";
-import {
-  deleteDeckFromSupabase,
-  getAllDecksFromSupabase,
-} from "@/lib/supabase-decks";
+import { createBrowserClient } from "@supabase/ssr";
+import Link from "next/link";
 
-const STARTER_DECK_IDS = new Set(["basics", "travel", "food"]);
+interface Deck {
+  id: string;
+  name: string;
+  description: string | null;
+  cards: { count: number }[];
+}
 
 export default function DecksPage() {
-  const [allDecks, setAllDecks] = useState<Deck[]>([]);
+  const [decks, setDecks] = useState<Deck[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   async function loadDecks() {
-    try {
-      const decks = await getAllDecksFromSupabase();
-      console.log("Loaded decks from Supabase:", decks);
-      setAllDecks(decks);
-    } catch (error) {
-      console.error("Failed to load decks:", error);
-    } finally {
-      setLoading(false);
+    const { data, error } = await supabase
+      .from("decks")
+      .select(`id, name, description, cards(count)`)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) setDecks(data as any);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadDecks(); }, []);
+
+  // --- DELETE FUNCTION ---
+  async function deleteDeck(id: string) {
+    if (!window.confirm("Delete this deck and all its cards forever?")) return;
+
+    const { error } = await supabase.from("decks").delete().eq("id", id);
+    
+    if (error) {
+      alert("Error: Make sure you ran the SQL Cascade script in Supabase!");
+    } else {
+      setDecks(decks.filter(d => d.id !== id));
     }
   }
 
-  useEffect(() => {
-    loadDecks();
-  }, []);
-
-  async function deleteDeck(id: string) {
-    const isStarterDeck = STARTER_DECK_IDS.has(id);
-    if (isStarterDeck) return;
-
-    const confirmed = window.confirm("Delete this deck?");
-    if (!confirmed) return;
-
-    await deleteDeckFromSupabase(id);
-    await loadDecks();
+  // --- EDIT FUNCTIONS ---
+  function startEditing(deck: Deck) {
+    setEditingId(deck.id);
+    setEditName(deck.name);
   }
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-gray-100 p-6">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-lg text-gray-700">Loading decks...</p>
-        </div>
-      </main>
-    );
+  async function saveName(id: string) {
+    const { error } = await supabase
+      .from("decks")
+      .update({ name: editName })
+      .eq("id", id);
+
+    if (!error) {
+      setDecks(decks.map(d => d.id === id ? { ...d, name: editName } : d));
+      setEditingId(null);
+    }
   }
+
+  if (loading) return <div className="p-10 text-center">Carregando...</div>;
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
+    <main className="min-h-screen bg-gray-50 p-8">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Your Decks</h1>
-
-          <div className="flex gap-3">
-            <Link
-              href="/create"
-              className="rounded-lg bg-green-600 px-4 py-2 text-white shadow hover:bg-green-700"
-            >
-              Create Deck
-            </Link>
-
-            <Link
-              href="/"
-              className="rounded-lg bg-gray-800 px-4 py-2 text-white shadow hover:bg-gray-900"
-            >
-              Home
-            </Link>
-          </div>
+        <div className="flex justify-between items-center mb-10">
+          <h1 className="text-4xl font-black text-gray-900">Your Library</h1>
+          <Link href="/upload" className="bg-purple-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-purple-700 transition-all">
+            + New AI Deck
+          </Link>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {allDecks.map((deck) => {
-            const isStarterDeck = STARTER_DECK_IDS.has(deck.id);
-
-            return (
-              <div key={deck.id} className="rounded-2xl bg-white p-6 shadow-lg">
-                <h2 className="mb-2 text-2xl font-semibold text-gray-900">
-                  {deck.title}
-                </h2>
-
-                <p className="mb-4 text-gray-600">{deck.description}</p>
-
-                <p className="mb-6 text-sm text-gray-500">
-                  {Array.isArray(deck.cards) ? deck.cards.length : 0} cards
-                </p>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href={`/decks/${deck.id}`}
-                    className="rounded-xl bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
-                  >
-                    Study Cards
-                  </Link>
-
-                  <Link
-                    href={`/quiz/${deck.id}`}
-                    className="rounded-xl bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-700"
-                  >
-                    Quiz Mode
-                  </Link>
-
-                  {!isStarterDeck && (
-                    <>
-                      <Link
-                        href={`/edit/${deck.id}`}
-                        className="rounded-xl bg-amber-500 px-5 py-3 font-medium text-white hover:bg-amber-600"
-                      >
-                        Edit
-                      </Link>
-
-                      <button
-                        onClick={() => deleteDeck(deck.id)}
-                        className="rounded-xl bg-red-500 px-5 py-3 font-medium text-white hover:bg-red-600"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
+          {decks.map((deck) => (
+            <div key={deck.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
+              <div>
+                {editingId === deck.id ? (
+                  <div className="flex gap-2 mb-4">
+                    <input 
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="border-2 border-purple-200 rounded-xl px-4 py-2 w-full font-bold outline-none"
+                      autoFocus
+                    />
+                    <button onClick={() => saveName(deck.id)} className="bg-green-500 text-white px-4 rounded-xl font-bold">Save</button>
+                  </div>
+                ) : (
+                  <h2 className="text-2xl font-black text-gray-800 mb-2">{deck.name}</h2>
+                )}
+                <p className="text-gray-400 text-sm mb-6">{deck.cards?.[0]?.count || 0} vocabulary cards</p>
               </div>
-            );
-          })}
+
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/decks/${deck.id}`} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm">Study</Link>
+                <Link href={`/quiz/${deck.id}`} className="bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm">Quiz</Link>
+                
+                <div className="flex-1" /> {/* Spacer */}
+                
+                <button 
+                  onClick={() => startEditing(deck)}
+                  className="bg-gray-100 text-gray-500 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-200"
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => deleteDeck(deck.id)}
+                  className="bg-red-50 text-red-400 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-red-100"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </main>
