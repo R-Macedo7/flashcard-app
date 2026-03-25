@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Deck {
   id: string;
@@ -14,8 +15,7 @@ interface Deck {
 export default function DecksPage() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
+  const router = useRouter();
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,91 +34,101 @@ export default function DecksPage() {
 
   useEffect(() => { loadDecks(); }, []);
 
-  // --- DELETE FUNCTION ---
   async function deleteDeck(id: string) {
-    if (!window.confirm("Delete this deck and all its cards forever?")) return;
-
-    const { error } = await supabase.from("decks").delete().eq("id", id);
-    
-    if (error) {
-      alert("Error: Make sure you ran the SQL Cascade script in Supabase!");
-    } else {
-      setDecks(decks.filter(d => d.id !== id));
+    if (!window.confirm("Delete this deck forever?")) return;
+  
+    try {
+      const { error } = await supabase
+        .from("decks")
+        .delete()
+        .eq("id", id);
+  
+      if (error) throw error;
+  
+      setDecks((currentDecks) => currentDecks.filter((d) => d.id !== id));
+      router.refresh();
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Error deleting deck.");
     }
   }
 
-  // --- EDIT FUNCTIONS ---
-  function startEditing(deck: Deck) {
-    setEditingId(deck.id);
-    setEditName(deck.name);
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <p className="font-black text-gray-300 uppercase tracking-widest animate-pulse">Carregando Biblioteca...</p>
+      </main>
+    );
   }
-
-  async function saveName(id: string) {
-    const { error } = await supabase
-      .from("decks")
-      .update({ name: editName })
-      .eq("id", id);
-
-    if (!error) {
-      setDecks(decks.map(d => d.id === id ? { ...d, name: editName } : d));
-      setEditingId(null);
-    }
-  }
-
-  if (loading) return <div className="p-10 text-center">Carregando...</div>;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="flex justify-between items-center mb-10">
-          <h1 className="text-4xl font-black text-gray-900">Your Library</h1>
-          <Link href="/upload" className="bg-purple-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-purple-700 transition-all">
-            + New AI Deck
-          </Link>
+    <main className="min-h-screen bg-gray-50 px-6 py-12">
+      <div className="mx-auto max-w-6xl">
+        
+        {/* HEADER SECTION - Cleaned up (No buttons here anymore) */}
+        <div className="mb-12">
+          <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-2">My Library</h1>
+          <p className="text-gray-500 font-medium italic">Your personalized collection of Portuguese vocabulary</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {decks.map((deck) => (
-            <div key={deck.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
-              <div>
-                {editingId === deck.id ? (
-                  <div className="flex gap-2 mb-4">
-                    <input 
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="border-2 border-purple-200 rounded-xl px-4 py-2 w-full font-bold outline-none"
-                      autoFocus
-                    />
-                    <button onClick={() => saveName(deck.id)} className="bg-green-500 text-white px-4 rounded-xl font-bold">Save</button>
+        {/* DECKS GRID */}
+        {decks.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-gray-200">
+            <p className="text-gray-400 font-bold mb-4">You haven't created any decks yet.</p>
+            <Link href="/create" className="text-purple-600 font-black uppercase tracking-widest text-sm hover:underline">Start Creating ✨</Link>
+          </div>
+        ) : (
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {decks.map((deck) => (
+              <div key={deck.id} className="group bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-50 hover:shadow-2xl transition-all flex flex-col justify-between relative overflow-hidden">
+                
+                {/* DECK INFO */}
+                <div className="mb-8">
+                  <div className="flex justify-between items-start mb-4">
+                     <span className="bg-purple-50 text-purple-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                       {deck.cards?.[0]?.count || 0} Cards
+                     </span>
+                     
+                     {/* TEXT-BASED ACTION BUTTONS */}
+                     <div className="flex gap-4">
+                        <Link 
+                          href={`/decks/${deck.id}/edit`} 
+                          className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-purple-600 transition-colors"
+                        >
+                          Edit
+                        </Link>
+                        <button 
+                          onClick={() => deleteDeck(deck.id)}
+                          className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          Delete
+                        </button>
+                     </div>
                   </div>
-                ) : (
-                  <h2 className="text-2xl font-black text-gray-800 mb-2">{deck.name}</h2>
-                )}
-                <p className="text-gray-400 text-sm mb-6">{deck.cards?.[0]?.count || 0} vocabulary cards</p>
-              </div>
+                  <h2 className="text-3xl font-black text-gray-900 leading-tight mb-2 group-hover:text-purple-600 transition-colors">
+                    {deck.name}
+                  </h2>
+                </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Link href={`/decks/${deck.id}`} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm">Study</Link>
-                <Link href={`/quiz/${deck.id}`} className="bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm">Quiz</Link>
-                
-                <div className="flex-1" /> {/* Spacer */}
-                
-                <button 
-                  onClick={() => startEditing(deck)}
-                  className="bg-gray-100 text-gray-500 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-200"
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={() => deleteDeck(deck.id)}
-                  className="bg-red-50 text-red-400 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-red-100"
-                >
-                  Delete
-                </button>
+                {/* ACTION BUTTONS */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Link 
+                    href={`/decks/${deck.id}`} 
+                    className="flex items-center justify-center bg-gray-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200"
+                  >
+                    Study
+                  </Link>
+                  <Link 
+                    href={`/quiz/${deck.id}`} 
+                    className="flex items-center justify-center bg-purple-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-purple-700 transition-all shadow-lg shadow-purple-100"
+                  >
+                    Quiz
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { translateText } from "@/app/actions/translate";
 
 export default function TranslatorPage() {
@@ -60,43 +59,39 @@ export default function TranslatorPage() {
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-10 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-black text-gray-900 tracking-tight">AI Translator</h1>
-            <p className="text-gray-500 font-medium">European Portuguese (PT-PT) Specialist</p>
-          </div>
-          {/* UPDATED LINK: Pointing to /decks */}
-          <Link href="/decks" className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-gray-600 shadow-sm border border-gray-200 hover:bg-gray-50 transition-all">
-            ← Back to Decks
-          </Link>
+        
+        {/* HEADER SECTION - Simplified (Back button removed) */}
+        <div className="mb-10 text-center md:text-left">
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">AI Translator</h1>
+          <p className="text-gray-500 font-medium">European Portuguese (PT-PT) Specialist</p>
         </div>
 
         {/* Language Switcher */}
-        <div className="mb-6 flex items-center justify-center">
+        <div className="mb-10 flex items-center justify-center">
           <div className="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
-            <div className={`px-6 py-2 rounded-xl font-bold transition-all ${mode === 'en-to-pt' ? 'bg-purple-50 text-purple-600' : 'text-gray-400'}`}>
+            <div className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${mode === 'en-to-pt' ? 'bg-purple-50 text-purple-600' : 'text-gray-300'}`}>
               English
             </div>
             <button 
               onClick={swapLanguages}
-              className="p-3 bg-gray-100 rounded-full hover:bg-purple-600 hover:text-white transition-all duration-300"
+              className="p-3 bg-gray-50 rounded-full hover:bg-purple-600 hover:text-white transition-all duration-300 text-sm"
             >
               🔄
             </button>
-            <div className={`px-6 py-2 rounded-xl font-bold transition-all ${mode === 'pt-to-en' ? 'bg-purple-50 text-purple-600' : 'text-gray-400'}`}>
+            <div className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${mode === 'pt-to-en' ? 'bg-purple-50 text-purple-600' : 'text-gray-300'}`}>
               Português
             </div>
           </div>
         </div>
 
+        {/* Translation Area */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="group relative">
             <textarea
               placeholder={mode === "en-to-pt" ? "Type English..." : "Escreva em Português..."}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              className="w-full h-80 rounded-[2.5rem] border-2 border-transparent bg-white p-8 text-2xl font-medium outline-none shadow-xl focus:border-purple-100 transition-all resize-none placeholder:text-gray-200 !text-black"
-              style={{ color: 'black' }}
+              className="w-full h-80 rounded-[2.5rem] border-2 border-transparent bg-white p-8 text-2xl font-bold outline-none shadow-xl focus:border-purple-100 transition-all resize-none placeholder:text-gray-200 text-black"
             />
             {mode === "pt-to-en" && inputText && (
               <button 
@@ -109,13 +104,13 @@ export default function TranslatorPage() {
           </div>
 
           <div className="relative">
-            <div className={`w-full h-80 rounded-[2.5rem] border border-gray-100 p-8 text-2xl font-bold shadow-xl transition-all flex flex-col justify-between ${isTranslating ? 'bg-purple-50/30 text-purple-300' : 'bg-white !text-gray-900'}`}>
+            <div className={`w-full h-80 rounded-[2.5rem] border border-gray-100 p-8 text-2xl font-bold shadow-xl transition-all flex flex-col justify-between ${isTranslating ? 'bg-purple-50/30 text-purple-300' : 'bg-white text-gray-900'}`}>
               <div className="overflow-y-auto">
                 {outputText || (isTranslating ? "Translating..." : "...")}
               </div>
               
               <div className="flex justify-between items-center pt-4">
-                {mode === "en-to-pt" && outputText && !isTranslating ? (
+                {(mode === "en-to-pt" && outputText && !isTranslating) ? (
                   <button 
                     onClick={() => speakPortuguese(outputText)}
                     className="text-2xl p-2 bg-purple-50 rounded-xl hover:scale-110 transition-all"
@@ -127,7 +122,7 @@ export default function TranslatorPage() {
                 {outputText && !isTranslating && (
                   <button 
                     onClick={handleCopy}
-                    className="px-4 py-2 rounded-xl bg-gray-50 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-purple-50 hover:text-purple-600 transition-all"
+                    className="px-4 py-2 rounded-xl bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-purple-50 hover:text-purple-600 transition-all"
                   >
                     {copied ? "Copied! ✅" : "Copy Translation"}
                   </button>
