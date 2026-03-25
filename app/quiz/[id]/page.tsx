@@ -31,15 +31,20 @@ export default function QuizPage() {
   const [showCorrectAnswer, setShowCorrectAnswer] = useState(false);
   const [ptToEn, setPtToEn] = useState(true);
 
-  // 1. Fetch Data
+  // 1. Fetch & Shuffle Data
   useEffect(() => {
     if (!id) return;
     async function loadQuizData() {
       try {
         const { data: deckData } = await supabase.from("decks").select("name").eq("id", id).single();
         const { data: cardData } = await supabase.from("cards").select("*").eq("deck_id", id);
+        
         if (deckData) setDeckName(deckData.name);
-        if (cardData) setQuizCards([...cardData].sort(() => Math.random() - 0.5));
+        if (cardData) {
+          // SHUFFLE: Fisher-Yates shuffle to ensure a different order every time
+          const shuffled = [...cardData].sort(() => Math.random() - 0.5);
+          setQuizCards(shuffled);
+        }
       } catch (error) {
         console.error("Quiz Load Error:", error);
       } finally {
@@ -58,11 +63,17 @@ export default function QuizPage() {
 
   const currentCard = quizCards[currentIndex];
 
+  // 2. STRENGTHENED PT-PT PRONUNCIATION
   const speakPortuguese = useCallback(() => {
     if (!window.speechSynthesis || !currentCard) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(currentCard.pt);
     utterance.lang = "pt-PT";
+    
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find(v => v.lang === "pt-PT" || v.lang === "pt_PT");
+    if (ptVoice) utterance.voice = ptVoice;
+    
     window.speechSynthesis.speak(utterance);
   }, [currentCard]);
 
@@ -88,14 +99,16 @@ export default function QuizPage() {
   const handleNext = () => {
     if (!awaitingNext) return;
     const updatedCards = [...quizCards];
-    const wrongCard = updatedCards[currentIndex];
+    const finishedCard = updatedCards[currentIndex];
 
     if (resultState === "correct") {
+      // Remove it completely
       updatedCards.splice(currentIndex, 1);
     } else {
+      // WRONG ANSWER RE-INSERT LOGIC
       updatedCards.splice(currentIndex, 1);
-      const insertIdx = Math.min(currentIndex + 2, updatedCards.length);
-      updatedCards.splice(insertIdx, 0, wrongCard);
+      const insertIdx = Math.min(2, updatedCards.length); // Insert 2 spots away
+      updatedCards.splice(insertIdx, 0, finishedCard);
     }
 
     if (updatedCards.length === 0) {
@@ -111,7 +124,15 @@ export default function QuizPage() {
     }
   };
 
-  if (loading) return <main className="flex min-h-screen items-center justify-center bg-gray-50"><p className="font-bold text-gray-400">Loading Quiz...</p></main>;
+  // 3. OVERRIDE FUNCTION
+  const handleOverrideCorrect = () => {
+    if (resultState !== "incorrect") return;
+    setFeedback("Accepted as correct ✅");
+    setResultState("correct");
+    setShowCorrectAnswer(false);
+  };
+
+  if (loading) return <main className="flex min-h-screen items-center justify-center bg-gray-50"><p className="font-bold text-gray-400 uppercase tracking-widest">Loading Quiz...</p></main>;
 
   if (completed || quizCards.length === 0) {
     return (
@@ -122,7 +143,6 @@ export default function QuizPage() {
           <p className="text-gray-500 mb-8">You finished "{deckName}"</p>
           <div className="flex flex-col gap-3">
             <button onClick={() => window.location.reload()} className="rounded-2xl bg-purple-600 px-6 py-4 font-bold text-white hover:bg-purple-700 transition-all">Restart Quiz</button>
-            {/* UPDATED: Points to /decks */}
             <Link href="/decks" className="rounded-2xl bg-gray-100 px-6 py-4 font-bold text-gray-600 hover:bg-gray-200 transition-all">Back to Decks</Link>
           </div>
         </div>
@@ -134,7 +154,6 @@ export default function QuizPage() {
     <main className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-3xl">
         <div className="mb-8 flex items-center justify-between">
-          {/* UPDATED: Points to /decks */}
           <Link href="/decks" className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-500 shadow-sm border border-gray-100 hover:text-purple-600 transition-colors">← Exit Quiz</Link>
           <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">{deckName}</p>
           <button 
@@ -145,7 +164,7 @@ export default function QuizPage() {
           </button>
         </div>
 
-        <div className="rounded-[2.5rem] bg-white p-10 shadow-xl border border-gray-100 relative">
+        <div className="rounded-[2.5rem] bg-white p-10 shadow-xl border border-gray-100 relative overflow-hidden">
           <div className="flex justify-between items-center mb-8">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">
               {ptToEn ? "Translate to English" : "Traduz para Português"}
@@ -190,12 +209,26 @@ export default function QuizPage() {
             </button>
           </div>
 
+          {/* 4. RE-ADDED OVERRIDE & FEEDBACK SECTION */}
           {(showCorrectAnswer || feedback) && (
-            <div className={`mt-8 rounded-3xl p-6 border-2 ${resultState === 'correct' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
-                <p className={`text-[10px] font-black uppercase mb-1 ${resultState === 'correct' ? 'text-green-600' : 'text-red-600'}`}>
-                  {resultState === 'correct' ? 'Well Done!' : 'The correct answer was:'}
-                </p>
-                <p className="text-2xl font-black text-gray-900">{showCorrectAnswer ? (ptToEn ? currentCard.en : currentCard.pt) : feedback}</p>
+            <div className={`mt-8 rounded-3xl p-6 border-2 flex justify-between items-center ${resultState === 'correct' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                <div>
+                  <p className={`text-[10px] font-black uppercase mb-1 ${resultState === 'correct' ? 'text-green-600' : 'text-red-600'}`}>
+                    {resultState === 'correct' ? 'Well Done!' : 'The correct answer was:'}
+                  </p>
+                  <p className="text-2xl font-black text-gray-900">
+                    {showCorrectAnswer ? (ptToEn ? currentCard.en : currentCard.pt) : feedback}
+                  </p>
+                </div>
+                
+                {resultState === "incorrect" && (
+                  <button 
+                    onClick={handleOverrideCorrect}
+                    className="text-[10px] font-black uppercase bg-white border border-red-200 px-4 py-2 rounded-xl text-red-400 hover:text-green-600 hover:border-green-200 transition-all shadow-sm"
+                  >
+                    I was right
+                  </button>
+                )}
             </div>
           )}
         </div>
@@ -205,7 +238,7 @@ export default function QuizPage() {
             <div className="h-full bg-purple-400 transition-all duration-500" style={{ width: `${(1 - quizCards.length / (quizCards.length + 1)) * 100}%` }} />
           </div>
           <p className="text-xs font-black text-gray-300 uppercase tracking-widest">
-            {quizCards.length} cards remaining
+            {quizCards.length} cards left
           </p>
         </div>
       </div>
