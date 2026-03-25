@@ -16,7 +16,19 @@ export default function Home() {
         </div>
 
         <div className="grid gap-4">
-          {/* NEW: PDF TO DECK (The one we just built!) */}
+          {/* VERB EXPLORER (The one we just finished!) */}
+          <Link
+            href="/verbs"
+            className="group flex items-center justify-between rounded-3xl border-2 border-amber-100 bg-amber-50 px-8 py-6 transition-all hover:border-amber-400 hover:bg-white hover:shadow-xl"
+          >
+            <div className="flex flex-col">
+              <span className="text-2xl font-black text-amber-900">Verb Explorer</span>
+              <span className="text-sm text-amber-600 font-medium italic">500+ Conjugations with Audio</span>
+            </div>
+            <span className="text-4xl group-hover:scale-110 transition-transform">🗣️</span>
+          </Link>
+
+          {/* PDF TO DECK */}
           <Link
             href="/upload"
             className="group flex items-center justify-between rounded-3xl border-2 border-purple-100 bg-purple-50 px-8 py-6 transition-all hover:border-purple-400 hover:bg-white hover:shadow-xl"
@@ -55,18 +67,24 @@ export default function Home() {
           <div className="h-px bg-gray-100 my-4" />
 
           {/* SECONDARY OPTIONS */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
              <Link
                 href="/create"
-                className="text-center py-4 rounded-2xl bg-gray-50 text-sm font-bold text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
+                className="text-center py-4 rounded-2xl bg-gray-50 text-[10px] font-bold text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
               >
                 + Manual Deck
               </Link>
               <Link
                 href="/ai-create"
-                className="text-center py-4 rounded-2xl bg-gray-50 text-sm font-bold text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-all border border-gray-100"
+                className="text-center py-4 rounded-2xl bg-gray-50 text-[10px] font-bold text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-all border border-gray-100"
               >
-                ✨ Prompt Generator
+                ✨ Prompt Gen
+              </Link>
+              <Link
+                href="/quiz"
+                className="text-center py-4 rounded-2xl bg-gray-50 text-[10px] font-bold text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all border border-gray-100"
+              >
+                📝 Quiz Mode
               </Link>
           </div>
         </div>
