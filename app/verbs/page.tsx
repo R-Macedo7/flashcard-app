@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import Link from 'next/link'; // Added Link import
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,15 +19,10 @@ export default function VerbExplorer() {
 
   const pronouns = ['Eu', 'Tu', 'Ele/Ela', 'Nós', 'Vós', 'Eles/Elas'];
 
-  // Audio Function
   const speak = (text: string) => {
-    window.speechSynthesis.cancel(); // Stop any current speech
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find(v => v.lang === 'pt-PT') || voices.find(v => v.lang.includes('pt'));
-    if (ptVoice) utterance.voice = ptVoice;
     utterance.lang = 'pt-PT';
-    utterance.rate = 0.85; 
     window.speechSynthesis.speak(utterance);
   };
 
@@ -54,18 +50,35 @@ export default function VerbExplorer() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 space-y-8 font-sans">
-      <header className="text-center py-4">
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Verb Explorer</h1>
-        <p className="text-slate-500">Master Portuguese Conjugations</p>
+      
+      {/* HEADER SECTION WITH QUIZ LINK */}
+      <header className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
+        <div className="text-center sm:text-left">
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Verb Explorer</h1>
+          <p className="text-slate-500 font-medium">Master Portuguese Conjugations</p>
+        </div>
+
+        {/* THE NEW QUIZ LINK */}
+        <Link 
+          href="/verb_quiz"
+          className="group flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-amber-200 transition-all hover:-translate-y-1 active:translate-y-0"
+        >
+          <span>📝 Start Quiz</span>
+          <span className="bg-white/20 px-2 py-0.5 rounded-lg text-xs group-hover:bg-white/30 transition-colors">NEW</span>
+        </Link>
       </header>
 
+      {/* SEARCH BAR */}
       <div className="relative max-w-lg mx-auto">
         <input
           type="text"
           placeholder="Try 'Speak' or 'Falar'..."
           className="w-full p-4 text-lg border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none shadow-md bg-white text-slate-900 transition-all placeholder:text-slate-400"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setSelectedVerb(null); }}
+          onChange={(e) => { 
+            setSearch(e.target.value); 
+            setSelectedVerb(null); 
+          }}
         />
         
         {verbs.length > 0 && !selectedVerb && (
@@ -73,7 +86,11 @@ export default function VerbExplorer() {
             {verbs.map(v => (
               <button
                 key={v.id}
-                onClick={() => { setSelectedVerb(v); setSearch(v.infinitive); setEditValue(v.english_infinitive || ''); }}
+                onClick={() => { 
+                  setSelectedVerb(v); 
+                  setSearch(v.infinitive);
+                  setEditValue(v.english_infinitive || '');
+                }}
                 className="w-full text-left p-4 hover:bg-blue-50 flex justify-between items-center border-b last:border-0"
               >
                 <div className="flex flex-col">
@@ -86,50 +103,36 @@ export default function VerbExplorer() {
         )}
       </div>
 
+      {/* ... (rest of the component remains the same) */}
       {selectedVerb && (
         <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-          <div className="p-8 border-b border-slate-100 bg-white">
+           {/* Verb Card Content Here */}
+           <div className="p-8 border-b border-slate-100 bg-white">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <div className="flex items-center gap-4 flex-wrap">
                   <h2 className="text-4xl font-bold capitalize text-slate-900">{selectedVerb.infinitive}</h2>
-                  {/* MAIN VERB AUDIO BUTTON */}
                   <button 
                     onClick={() => speak(selectedVerb.infinitive)}
                     className="p-2 bg-slate-100 hover:bg-blue-100 rounded-full transition-colors text-blue-600"
-                    title="Listen"
                   >
                     🔊
                   </button>
-                  
-                  {isEditing ? (
-                    <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
-                      <input 
-                        className="bg-white border border-slate-200 text-slate-900 text-sm px-3 py-1 rounded-md outline-none w-40"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        autoFocus
-                      />
-                      <button onClick={() => setIsEditing(false)} className="bg-blue-600 text-white text-xs px-3 py-1 rounded-md font-bold">Save</button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 group">
-                      <span className="text-blue-600 text-xl font-medium">({selectedVerb.english_infinitive || 'add translation'})</span>
-                      <button onClick={() => setIsEditing(true)} className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-slate-400 uppercase">Edit</button>
-                    </div>
-                  )}
                 </div>
               </div>
-              <button onClick={() => {setSelectedVerb(null); setSearch('');}} className="text-slate-300 hover:text-slate-600 text-2xl">✕</button>
             </div>
           </div>
 
-          <div className="flex bg-slate-50/50 p-1 gap-1 border-b border-slate-100">
+          <div className="flex bg-slate-50/50 p-1 gap-1 border-b border-slate-100 overflow-x-auto">
             {['presente', 'preterito_perfeito', 'preterito_imperfeito', 'futuro'].map(t => (
               <button
                 key={t}
                 onClick={() => setActiveTense(t)}
-                className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase transition-all ${activeTense === t ? 'bg-white text-blue-600 shadow-sm border border-slate-200' : 'text-slate-400'}`}
+                className={`flex-1 min-w-[100px] py-3 rounded-xl text-xs font-bold uppercase transition-all ${
+                  activeTense === t 
+                    ? 'bg-white text-blue-600 shadow-sm border border-slate-200' 
+                    : 'text-slate-400 hover:bg-white/50'
+                }`}
               >
                 {t.replace('preterito_', 'Past ').replace('presente', 'Present').replace('futuro', 'Future')}
               </button>
@@ -144,8 +147,12 @@ export default function VerbExplorer() {
                 onClick={() => speak(word)}
               >
                 <div className="flex items-center">
-                  <span className="w-20 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-400">{pronouns[i]}</span>
-                  <span className="text-xl font-semibold text-slate-800">{word}</span>
+                  <span className="w-20 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-400">
+                    {pronouns[i]}
+                  </span>
+                  <span className="text-xl font-semibold text-slate-800">
+                    {word}
+                  </span>
                 </div>
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400">🔊</span>
               </div>

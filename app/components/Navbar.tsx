@@ -20,9 +20,9 @@ export const Navbar = () => {
           <span className="text-2xl">🇵🇹</span>
           <div className="hidden sm:flex items-center">
             {/* GREEN FOR PORTUGAL FLAG */}
-            <span className="text-emerald-600">Lisbon</span>
+            <span className="text-emerald-600">Learning</span>
             {/* RED FOR PORTUGAL FLAG */}
-            <span className="text-red-600 ml-1">Lingo</span>
+            <span className="text-red-600 ml-1">Portuguese</span>
           </div>
         </Link>
 

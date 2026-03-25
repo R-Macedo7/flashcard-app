@@ -8,7 +8,7 @@ export default function Home() {
       <div className="mx-auto max-w-2xl w-full rounded-[3rem] bg-white p-12 shadow-2xl border border-gray-100">
         <div className="text-center mb-10">
           <h1 className="mb-2 text-6xl font-black text-gray-900 tracking-tighter">
-            Lisbon Lingo <span className="text-4xl">🇵🇹</span>
+            Learning Portuguese <span className="text-4xl">🇵🇹</span>
           </h1>
           <p className="text-gray-500 text-lg font-medium">
             Master European Portuguese with AI-powered tools.
@@ -16,7 +16,7 @@ export default function Home() {
         </div>
 
         <div className="grid gap-4">
-          {/* VERB EXPLORER (The one we just finished!) */}
+          {/* VERB EXPLORER */}
           <Link
             href="/verbs"
             className="group flex items-center justify-between rounded-3xl border-2 border-amber-100 bg-amber-50 px-8 py-6 transition-all hover:border-amber-400 hover:bg-white hover:shadow-xl"
@@ -80,11 +80,12 @@ export default function Home() {
               >
                 ✨ Prompt Gen
               </Link>
+              {/* UPDATED: Path changed to /verb_quiz */}
               <Link
-                href="/quiz"
+                href="/verb_quiz"
                 className="text-center py-4 rounded-2xl bg-gray-50 text-[10px] font-bold text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all border border-gray-100"
               >
-                📝 Quiz Mode
+                📝 Verb Quiz Mode
               </Link>
           </div>
         </div>
