@@ -31,7 +31,42 @@ export default function QuizPage() {
   const [showCorrectAnswer, setShowCorrectAnswer] = useState(false);
   const [ptToEn, setPtToEn] = useState(true);
 
-  // 1. Fetch & Shuffle Data
+  const currentCard = quizCards[currentIndex];
+
+  // --- STRICT PT-PT AUDIO LOGIC (Only triggers on click) ---
+  const speakPortuguese = useCallback(() => {
+    if (!window.speechSynthesis || !currentCard) return;
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(currentCard.pt);
+    const voices = window.speechSynthesis.getVoices();
+    
+    // STRICT FILTER: Only European Portuguese
+    const europeanPtVoice = voices.find(v => v.lang === 'pt-PT' || v.lang === 'pt_PT');
+
+    if (europeanPtVoice) {
+      utterance.voice = europeanPtVoice;
+      utterance.lang = 'pt-PT';
+    } else {
+      // FAIL GUARDRAIL: Default to US English so you know it failed
+      console.warn("PT-PT Voice not found. Defaulting to American Robot.");
+      utterance.lang = 'en-US'; 
+    }
+
+    utterance.rate = 0.85;
+    window.speechSynthesis.speak(utterance);
+  }, [currentCard]); // Re-bind specifically when the card changes
+
+  // Prime voices and handle async loading
+  useEffect(() => {
+    const loadVoices = () => window.speechSynthesis.getVoices();
+    loadVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
+
+  // Fetch Data
   useEffect(() => {
     if (!id) return;
     async function loadQuizData() {
@@ -41,7 +76,6 @@ export default function QuizPage() {
         
         if (deckData) setDeckName(deckData.name);
         if (cardData) {
-          // SHUFFLE: Fisher-Yates shuffle to ensure a different order every time
           const shuffled = [...cardData].sort(() => Math.random() - 0.5);
           setQuizCards(shuffled);
         }
@@ -60,22 +94,6 @@ export default function QuizPage() {
       inputRef.current?.focus();
     }
   }, [loading, completed, currentIndex, awaitingNext]);
-
-  const currentCard = quizCards[currentIndex];
-
-  // 2. STRENGTHENED PT-PT PRONUNCIATION
-  const speakPortuguese = useCallback(() => {
-    if (!window.speechSynthesis || !currentCard) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(currentCard.pt);
-    utterance.lang = "pt-PT";
-    
-    const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find(v => v.lang === "pt-PT" || v.lang === "pt_PT");
-    if (ptVoice) utterance.voice = ptVoice;
-    
-    window.speechSynthesis.speak(utterance);
-  }, [currentCard]);
 
   const handleSubmit = () => {
     if (awaitingNext || !currentCard) return;
@@ -102,12 +120,10 @@ export default function QuizPage() {
     const finishedCard = updatedCards[currentIndex];
 
     if (resultState === "correct") {
-      // Remove it completely
       updatedCards.splice(currentIndex, 1);
     } else {
-      // WRONG ANSWER RE-INSERT LOGIC
       updatedCards.splice(currentIndex, 1);
-      const insertIdx = Math.min(2, updatedCards.length); // Insert 2 spots away
+      const insertIdx = Math.min(2, updatedCards.length);
       updatedCards.splice(insertIdx, 0, finishedCard);
     }
 
@@ -124,7 +140,6 @@ export default function QuizPage() {
     }
   };
 
-  // 3. OVERRIDE FUNCTION
   const handleOverrideCorrect = () => {
     if (resultState !== "incorrect") return;
     setFeedback("Accepted as correct ✅");
@@ -196,7 +211,6 @@ export default function QuizPage() {
                   ? (resultState === 'correct' ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700') 
                   : 'border-gray-100 bg-gray-50 !text-black focus:border-purple-300 focus:bg-white'
               }`}
-              style={{ color: awaitingNext ? undefined : 'black' }}
             />
 
             <button 
@@ -209,7 +223,6 @@ export default function QuizPage() {
             </button>
           </div>
 
-          {/* 4. RE-ADDED OVERRIDE & FEEDBACK SECTION */}
           {(showCorrectAnswer || feedback) && (
             <div className={`mt-8 rounded-3xl p-6 border-2 flex justify-between items-center ${resultState === 'correct' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                 <div>

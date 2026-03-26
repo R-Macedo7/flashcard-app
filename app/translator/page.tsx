@@ -10,18 +10,38 @@ export default function TranslatorPage() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // --- AUDIO LOGIC ---
+  // --- STRICT PT-PT AUDIO LOGIC ---
   const speakPortuguese = useCallback((text: string) => {
     if (!window.speechSynthesis || !text) return;
     window.speechSynthesis.cancel();
+    
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "pt-PT"; 
-    
     const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find(v => v.lang === "pt-PT" || v.lang === "pt_PT");
-    if (ptVoice) utterance.voice = ptVoice;
     
+    // STRICT FILTER: Only pt-PT or pt_PT allowed. No general "pt" fallback.
+    const europeanPtVoice = voices.find(v => v.lang === 'pt-PT' || v.lang === 'pt_PT');
+
+    if (europeanPtVoice) {
+      utterance.voice = europeanPtVoice;
+      utterance.lang = 'pt-PT';
+    } else {
+      // FORCE ROBOT: Explicitly set to US English if PT-PT is missing
+      console.warn("PT-PT Voice not found. Defaulting to American Robot for debugging.");
+      utterance.lang = 'en-US'; 
+    }
+
+    utterance.rate = 0.85; 
     window.speechSynthesis.speak(utterance);
+  }, []);
+
+  // Prime voices and handle async loading
+  useEffect(() => {
+    const loadVoices = () => window.speechSynthesis.getVoices();
+    loadVoices();
+    
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
   }, []);
 
   useEffect(() => {
@@ -60,7 +80,6 @@ export default function TranslatorPage() {
     <main className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-5xl">
         
-        {/* HEADER SECTION - Simplified (Back button removed) */}
         <div className="mb-10 text-center md:text-left">
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">AI Translator</h1>
           <p className="text-gray-500 font-medium">European Portuguese (PT-PT) Specialist</p>

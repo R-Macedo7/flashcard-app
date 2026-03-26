@@ -15,8 +15,16 @@ const TENSES = [
   { id: 'futuro', label: 'Future', color: 'bg-amber-600', hover: 'hover:border-amber-400'}
 ];
 
+const VERB_TYPES = [
+  { id: 'all', label: 'All Verbs' },
+  { id: 'regular', label: 'Regular' },
+  { id: 'irregular', label: 'Irregular' },
+  { id: 'reflexive', label: 'Reflexive' }
+];
+
 export default function VerbQuiz() {
   const [selectedTense, setSelectedTense] = useState<any>(null);
+  const [selectedType, setSelectedType] = useState('all'); // NEW: Type filter
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
@@ -25,9 +33,11 @@ export default function VerbQuiz() {
   const [loading, setLoading] = useState(false);
 
   const speak = (text: string) => {
+    if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'pt-PT';
+    utterance.rate = 0.85;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -36,22 +46,20 @@ export default function VerbQuiz() {
     setSelectedTense(tense);
     
     try {
-      // Fetch total count for random offset
-      const { count } = await supabase.from('verb_reference').select('*', { count: 'exact', head: true });
-      const totalVerbs = count || 500;
-      const randomOffset = Math.max(0, Math.floor(Math.random() * (totalVerbs - 20)));
+      let query = supabase.from('verb_reference').select('*');
 
-      const { data, error } = await supabase
-        .from('verb_reference')
-        .select('*')
-        .range(randomOffset, randomOffset + 19);
+      // NEW: Apply Type Filters to the Query
+      if (selectedType === 'irregular') query = query.eq('is_irregular', true);
+      if (selectedType === 'reflexive') query = query.eq('is_reflexive', true);
+      if (selectedType === 'regular') query = query.eq('is_irregular', false).eq('is_reflexive', false);
+
+      const { data, error } = await query.limit(20);
 
       if (error) throw error;
 
-      if (data) {
+      if (data && data.length > 0) {
         const syncedQuestions = data.map(verb => {
           const pIndex = Math.floor(Math.random() * 6);
-          // Safety check for conjugation path
           const answer = verb.conjugations?.[tense.id]?.[pIndex] || "error";
           return {
             verb,
@@ -60,6 +68,9 @@ export default function VerbQuiz() {
           };
         });
         setQuestions(syncedQuestions.sort(() => Math.random() - 0.5));
+      } else {
+        alert("No verbs found for this combination! Try a different filter.");
+        setSelectedTense(null);
       }
     } catch (err) {
       console.error("Quiz Fetch Error:", err);
@@ -90,27 +101,47 @@ export default function VerbQuiz() {
     setCurrentIndex(prev => prev + 1);
   };
 
-  // 1. TENSE SELECTION SCREEN
+  // 1. SELECTION SCREEN (With Type Toggles)
   if (!selectedTense && !loading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center">
-        <div className="max-w-2xl w-full space-y-8">
-          <div className="text-center space-y-2">
-            <h1 className="text-5xl font-black text-slate-900 tracking-tight">Focus Training</h1>
-            <p className="text-slate-500 text-lg font-medium">Pick a tense to drill today.</p>
+      <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center font-sans">
+        <div className="max-w-2xl w-full space-y-10">
+          <div className="text-center space-y-3">
+            <h1 className="text-6xl font-black text-slate-900 tracking-tighter italic">Focus Training</h1>
+            <p className="text-slate-500 text-lg font-medium">Customise your drill session.</p>
           </div>
+
+          {/* VERB TYPE TOGGLES */}
+          <div className="flex bg-white p-2 rounded-3xl shadow-sm border border-slate-200 max-w-md mx-auto">
+            {VERB_TYPES.map((type) => (
+              <button
+                key={type.id}
+                onClick={() => setSelectedType(type.id)}
+                className={`flex-1 py-3 px-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  selectedType === type.id 
+                  ? 'bg-slate-900 text-white shadow-lg' 
+                  : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {type.label}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {TENSES.map((t) => (
               <button
                 key={t.id}
                 onClick={() => startQuiz(t)}
-                className={`group p-8 bg-white border-2 border-slate-100 rounded-[2.5rem] ${t.hover} hover:shadow-xl transition-all text-left flex items-center gap-6`}
+                className={`group p-8 bg-white border-2 border-slate-100 rounded-[2.5rem] ${t.hover} hover:shadow-xl transition-all text-left relative overflow-hidden`}
               >
-                {/* Removed icon span to prevent errors */}
-                <div>
+                <div className="relative z-10">
                   <h3 className="text-2xl font-black text-slate-900">{t.label}</h3>
-                  <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">Conjugate all forms</p>
+                  <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mt-2">
+                    {selectedType} mode
+                  </p>
                 </div>
+                <div className={`absolute right-[-20px] bottom-[-20px] w-24 h-24 rounded-full opacity-[0.03] transition-transform group-hover:scale-150 ${t.color}`} />
               </button>
             ))}
           </div>
@@ -119,68 +150,73 @@ export default function VerbQuiz() {
     );
   }
 
-  // 2. LOADING STATE
+  // ... (Keep Loading and Final Score screens the same as your provided code) ...
+
+  // 4. THE QUIZ ENGINE (Small visual updates for filters)
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
       <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-      <p className="font-black text-slate-400 uppercase tracking-widest text-center px-4">Preparing {selectedTense?.label} Drill...</p>
+      <p className="font-black text-slate-400 uppercase tracking-widest text-center px-4 tracking-tighter">Syncing {selectedType} verbs...</p>
     </div>
   );
 
-  // 3. FINAL SCORE SCREEN
   if (questions.length > 0 && currentIndex >= questions.length) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white p-12 rounded-[3rem] shadow-2xl text-center border border-slate-100">
-        <span className="text-7xl mb-6 block">⭐</span>
-        <h2 className="text-4xl font-black mb-2 text-slate-900 tracking-tighter">Session Complete!</h2>
-        <p className="text-slate-500 mb-8 font-medium italic text-lg">You mastered {score} verbs in the {selectedTense?.label}!</p>
+        <span className="text-7xl mb-6 block">🏆</span>
+        <h2 className="text-4xl font-black mb-2 text-slate-900 tracking-tighter">Session Over!</h2>
+        <p className="text-slate-500 mb-8 font-medium text-lg">You nailed {score}/{questions.length} in {selectedTense?.label} mode.</p>
         <button 
           onClick={() => window.location.reload()} 
           className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xl hover:bg-black transition-all shadow-lg"
         >
-          Try Another Tense
+          Try Another Drill
         </button>
       </div>
     </div>
   );
 
   const current = questions[currentIndex];
-
-  // 4. THE QUIZ ENGINE
-  if (!current) return null; // Final safety check
+  if (!current) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center justify-center font-sans">
       <div className="max-w-xl w-full space-y-6">
         
         <div className="flex justify-between items-center px-4">
-          <button onClick={() => window.location.reload()} className="text-xs font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors">
-            ← Switch Tense
+          <button onClick={() => window.location.reload()} className="text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors">
+            ← Abort Drill
           </button>
           <div className="text-right">
-             <p className="text-xs font-black uppercase tracking-widest text-slate-400">Drill Score</p>
-             <p className="text-lg font-black text-emerald-600 leading-none">{score}</p>
+             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Current Run</p>
+             <p className="text-2xl font-black text-emerald-600 leading-none">{score}</p>
           </div>
         </div>
 
-        <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden shadow-inner">
-          <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
+        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner">
+          <div className="bg-emerald-500 h-full transition-all duration-700 ease-out" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
         </div>
 
-        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100 relative">
+        <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 relative overflow-hidden">
+          {/* Subtle badge for verb type */}
+          <div className="absolute top-8 right-8 flex gap-2">
+            {current.verb.is_irregular && <span className="text-amber-500 font-black text-xl">*</span>}
+            {current.verb.is_reflexive && <span className="text-blue-500 font-black text-xl">•</span>}
+          </div>
+
           <div className="text-center space-y-2 mb-10">
-            <div className={`inline-block px-4 py-1 rounded-full text-white text-[10px] font-black uppercase tracking-tighter ${selectedTense?.color}`}>
+            <div className={`inline-block px-4 py-1.5 rounded-full text-white text-[9px] font-black uppercase tracking-widest ${selectedTense?.color}`}>
               {selectedTense?.label}
             </div>
-            <h2 className="text-6xl font-black text-slate-900 capitalize tracking-tighter leading-none pt-2">
+            <h2 className="text-6xl font-black text-slate-900 capitalize tracking-tighter leading-none pt-4">
               {current.verb.infinitive}
             </h2>
             <p className="text-slate-400 text-lg font-medium italic">"{current.verb.english_infinitive}"</p>
           </div>
 
           <form onSubmit={handleCheck} className="space-y-6">
-            <div className="flex items-center p-6 bg-slate-50 rounded-2xl border-2 border-slate-100 relative group focus-within:border-blue-400 transition-all">
-              <span className="absolute left-6 text-2xl font-black text-slate-300 pointer-events-none">
+            <div className="flex items-center p-7 bg-slate-50 rounded-3xl border-2 border-slate-100 relative group focus-within:border-blue-400 transition-all">
+              <span className="absolute left-8 text-2xl font-black text-slate-300 pointer-events-none uppercase tracking-tighter">
                 {PRONOUNS[current.personIndex]}
               </span>
               <input 
@@ -188,30 +224,30 @@ export default function VerbQuiz() {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 disabled={feedback !== null}
-                placeholder="conjugate here..."
-                className={`w-full bg-transparent pl-36 text-2xl font-bold outline-none ${feedback === 'correct' ? 'text-emerald-600' : feedback === 'wrong' ? 'text-red-600' : 'text-slate-900'}`}
+                placeholder="..."
+                className={`w-full bg-transparent pl-36 text-2xl font-black outline-none ${feedback === 'correct' ? 'text-emerald-600' : feedback === 'wrong' ? 'text-red-600' : 'text-slate-900'}`}
               />
             </div>
 
             {feedback === null ? (
-              <button className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xl hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all">
-                Check Answer
+              <button className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-xl hover:shadow-2xl hover:-translate-y-1 transition-all">
+                Submit Answer
               </button>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                 {feedback === 'wrong' && (
-                  <div className="p-5 bg-red-50 border border-red-100 rounded-2xl text-center">
-                    <p className="text-red-400 text-[10px] font-black uppercase mb-1">Correct Conjugation:</p>
-                    <p className="text-red-600 text-3xl font-black">{current.correctAnswer}</p>
+                  <div className="p-6 bg-red-50 border-2 border-red-100 rounded-3xl text-center">
+                    <p className="text-red-400 text-[10px] font-black uppercase tracking-widest mb-2">The Answer was:</p>
+                    <p className="text-red-600 text-4xl font-black tracking-tight">{current.correctAnswer}</p>
                   </div>
                 )}
                 {feedback === 'correct' && (
-                   <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
-                    <p className="text-emerald-600 text-xl font-black">Boa! Continue assim! 🇵🇹</p>
+                   <div className="p-6 bg-emerald-50 border-2 border-emerald-100 rounded-3xl text-center">
+                    <p className="text-emerald-600 text-2xl font-black tracking-tighter italic">Excelente trabalho!</p>
                   </div>
                 )}
-                <button type="button" onClick={nextQuestion} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700 shadow-lg">
-                  Next Question →
+                <button type="button" onClick={nextQuestion} className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black text-xl hover:bg-blue-700 shadow-xl transition-all">
+                  Next Verb →
                 </button>
               </div>
             )}
