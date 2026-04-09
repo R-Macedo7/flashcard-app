@@ -24,7 +24,7 @@ const VERB_TYPES = [
 
 export default function VerbQuiz() {
   const [selectedTense, setSelectedTense] = useState<any>(null);
-  const [selectedType, setSelectedType] = useState('all'); // NEW: Type filter
+  const [selectedType, setSelectedType] = useState('all');
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
@@ -36,6 +36,7 @@ export default function VerbQuiz() {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
+    // Explicitly using Portugal pronunciation
     utterance.lang = 'pt-PT';
     utterance.rate = 0.85;
     window.speechSynthesis.speak(utterance);
@@ -46,14 +47,23 @@ export default function VerbQuiz() {
     setSelectedTense(tense);
     
     try {
-      let query = supabase.from('verb_reference').select('*');
+      // Get count for random range sampling
+      let countQuery = supabase.from('verb_reference').select('*', { count: 'exact', head: true });
+      if (selectedType === 'irregular') countQuery = countQuery.eq('is_irregular', true);
+      if (selectedType === 'reflexive') countQuery = countQuery.eq('is_reflexive', true);
+      if (selectedType === 'regular') countQuery = countQuery.eq('is_irregular', false).eq('is_reflexive', false);
 
-      // NEW: Apply Type Filters to the Query
+      const { count } = await countQuery;
+      const totalVerbs = count || 20;
+      const randomOffset = Math.max(0, Math.floor(Math.random() * (totalVerbs - 20)));
+
+      let query = supabase.from('verb_reference').select('*');
       if (selectedType === 'irregular') query = query.eq('is_irregular', true);
       if (selectedType === 'reflexive') query = query.eq('is_reflexive', true);
       if (selectedType === 'regular') query = query.eq('is_irregular', false).eq('is_reflexive', false);
 
-      const { data, error } = await query.limit(20);
+      // Fetch 20 random verbs
+      const { data, error } = await query.range(randomOffset, randomOffset + 19);
 
       if (error) throw error;
 
@@ -69,7 +79,7 @@ export default function VerbQuiz() {
         });
         setQuestions(syncedQuestions.sort(() => Math.random() - 0.5));
       } else {
-        alert("No verbs found for this combination! Try a different filter.");
+        alert("No verbs found! Try a different filter.");
         setSelectedTense(null);
       }
     } catch (err) {
@@ -92,6 +102,8 @@ export default function VerbQuiz() {
       speak(current.correctAnswer);
     } else {
       setFeedback('wrong');
+      // Logic: Add the question back into the array to be answered later
+      setQuestions(prev => [...prev, current]);
     }
   };
 
@@ -101,7 +113,7 @@ export default function VerbQuiz() {
     setCurrentIndex(prev => prev + 1);
   };
 
-  // 1. SELECTION SCREEN (With Type Toggles)
+  // 1. SELECTION SCREEN
   if (!selectedTense && !loading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center font-sans">
@@ -111,7 +123,6 @@ export default function VerbQuiz() {
             <p className="text-slate-500 text-lg font-medium">Customise your drill session.</p>
           </div>
 
-          {/* VERB TYPE TOGGLES */}
           <div className="flex bg-white p-2 rounded-3xl shadow-sm border border-slate-200 max-w-md mx-auto">
             {VERB_TYPES.map((type) => (
               <button
@@ -150,13 +161,10 @@ export default function VerbQuiz() {
     );
   }
 
-  // ... (Keep Loading and Final Score screens the same as your provided code) ...
-
-  // 4. THE QUIZ ENGINE (Small visual updates for filters)
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
       <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-      <p className="font-black text-slate-400 uppercase tracking-widest text-center px-4 tracking-tighter">Syncing {selectedType} verbs...</p>
+      <p className="font-black text-slate-400 uppercase tracking-widest text-center px-4 tracking-tighter text-sm">Shuffling random verbs...</p>
     </div>
   );
 
@@ -165,7 +173,7 @@ export default function VerbQuiz() {
       <div className="max-w-md w-full bg-white p-12 rounded-[3rem] shadow-2xl text-center border border-slate-100">
         <span className="text-7xl mb-6 block">🏆</span>
         <h2 className="text-4xl font-black mb-2 text-slate-900 tracking-tighter">Session Over!</h2>
-        <p className="text-slate-500 mb-8 font-medium text-lg">You nailed {score}/{questions.length} in {selectedTense?.label} mode.</p>
+        <p className="text-slate-500 mb-8 font-medium text-lg">You mastered all verbs in {selectedTense?.label} mode.</p>
         <button 
           onClick={() => window.location.reload()} 
           className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xl hover:bg-black transition-all shadow-lg"
@@ -188,8 +196,8 @@ export default function VerbQuiz() {
             ← Abort Drill
           </button>
           <div className="text-right">
-             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Current Run</p>
-             <p className="text-2xl font-black text-emerald-600 leading-none">{score}</p>
+             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Progress</p>
+             <p className="text-2xl font-black text-emerald-600 leading-none">{currentIndex + 1} / {questions.length}</p>
           </div>
         </div>
 
@@ -198,7 +206,6 @@ export default function VerbQuiz() {
         </div>
 
         <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 relative overflow-hidden">
-          {/* Subtle badge for verb type */}
           <div className="absolute top-8 right-8 flex gap-2">
             {current.verb.is_irregular && <span className="text-amber-500 font-black text-xl">*</span>}
             {current.verb.is_reflexive && <span className="text-blue-500 font-black text-xl">•</span>}
@@ -225,6 +232,7 @@ export default function VerbQuiz() {
                 onChange={(e) => setUserInput(e.target.value)}
                 disabled={feedback !== null}
                 placeholder="..."
+                autoComplete="off"
                 className={`w-full bg-transparent pl-36 text-2xl font-black outline-none ${feedback === 'correct' ? 'text-emerald-600' : feedback === 'wrong' ? 'text-red-600' : 'text-slate-900'}`}
               />
             </div>
@@ -237,8 +245,9 @@ export default function VerbQuiz() {
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                 {feedback === 'wrong' && (
                   <div className="p-6 bg-red-50 border-2 border-red-100 rounded-3xl text-center">
-                    <p className="text-red-400 text-[10px] font-black uppercase tracking-widest mb-2">The Answer was:</p>
+                    <p className="text-red-400 text-[10px] font-black uppercase tracking-widest mb-2">The Correct Answer was:</p>
                     <p className="text-red-600 text-4xl font-black tracking-tight">{current.correctAnswer}</p>
+                    <p className="text-red-400 text-[9px] font-black uppercase mt-3 italic">Re-shuffled into deck</p>
                   </div>
                 )}
                 {feedback === 'correct' && (
