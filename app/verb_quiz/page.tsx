@@ -32,22 +32,44 @@ export default function VerbQuiz() {
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // STRICT PT-PT VOICE SELECTION
   const speak = (text: string) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
+    
     const utterance = new SpeechSynthesisUtterance(text);
-    // Explicitly using Portugal pronunciation
-    utterance.lang = 'pt-PT';
-    utterance.rate = 0.85;
-    window.speechSynthesis.speak(utterance);
+    const voices = window.speechSynthesis.getVoices();
+    
+    // Specifically looking for Portugal (pt-PT) and excluding Brazil (pt-BR)
+    const ptPtVoice = voices.find(v => 
+      (v.lang === 'pt-PT' || v.lang === 'pt_PT') || 
+      (v.lang.startsWith('pt') && v.name.toLowerCase().includes('portugal'))
+    );
+
+    if (ptPtVoice) {
+      utterance.voice = ptPtVoice;
+      utterance.lang = 'pt-PT';
+      utterance.rate = 0.85;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.warn("Strict pt-PT voice not found. Please check macOS Spoken Content settings.");
+    }
   };
+
+  // Ensure voices are loaded into memory
+  useEffect(() => {
+    const loadVoices = () => window.speechSynthesis.getVoices();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
 
   const startQuiz = async (tense: any) => {
     setLoading(true);
     setSelectedTense(tense);
     
     try {
-      // Get count for random range sampling
       let countQuery = supabase.from('verb_reference').select('*', { count: 'exact', head: true });
       if (selectedType === 'irregular') countQuery = countQuery.eq('is_irregular', true);
       if (selectedType === 'reflexive') countQuery = countQuery.eq('is_reflexive', true);
@@ -62,7 +84,6 @@ export default function VerbQuiz() {
       if (selectedType === 'reflexive') query = query.eq('is_reflexive', true);
       if (selectedType === 'regular') query = query.eq('is_irregular', false).eq('is_reflexive', false);
 
-      // Fetch 20 random verbs
       const { data, error } = await query.range(randomOffset, randomOffset + 19);
 
       if (error) throw error;
@@ -102,7 +123,7 @@ export default function VerbQuiz() {
       speak(current.correctAnswer);
     } else {
       setFeedback('wrong');
-      // Logic: Add the question back into the array to be answered later
+      // Shuffle back into the deck
       setQuestions(prev => [...prev, current]);
     }
   };
@@ -113,7 +134,6 @@ export default function VerbQuiz() {
     setCurrentIndex(prev => prev + 1);
   };
 
-  // 1. SELECTION SCREEN
   if (!selectedTense && !loading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center font-sans">
