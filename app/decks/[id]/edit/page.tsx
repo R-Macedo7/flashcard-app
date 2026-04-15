@@ -19,6 +19,9 @@ export default function EditDeckPage() {
   const [deckName, setDeckName] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // State for tracking selected cards by their index
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     async function loadDeckData() {
@@ -45,6 +48,43 @@ export default function EditDeckPage() {
     setCards([...cards, { pt: "", en: "", example_pt: "", example_en: "", deck_id: id }]);
   };
 
+  // Toggle selection for a single card
+  const toggleSelection = (index: number) => {
+    const newSet = new Set(selectedIndices);
+    if (newSet.has(index)) {
+      newSet.delete(index);
+    } else {
+      newSet.add(index);
+    }
+    setSelectedIndices(newSet);
+  };
+
+  // Delete multiple selected cards
+  const deleteSelected = async () => {
+    if (selectedIndices.size === 0) return;
+
+    const cardsToDeleteFromDB = Array.from(selectedIndices)
+      .map(index => cards[index])
+      .filter(card => card && card.id);
+
+    const idsToDelete = cardsToDeleteFromDB.map(c => c.id);
+
+    if (idsToDelete.length > 0) {
+      const { error } = await supabase
+        .from("cards")
+        .delete()
+        .in("id", idsToDelete);
+        
+      if (error) {
+        alert("Could not delete cards from database: " + error.message);
+        return;
+      }
+    }
+
+    setCards(cards.filter((_, i) => !selectedIndices.has(i)));
+    setSelectedIndices(new Set());
+  };
+
   // --- FIX: DELETE FROM DATABASE IMMEDIATELY ---
   const removeCard = async (index: number) => {
     const cardToDelete = cards[index];
@@ -63,6 +103,7 @@ export default function EditDeckPage() {
     }
     
     setCards(cards.filter((_, i) => i !== index));
+    setSelectedIndices(new Set()); // Reset selection to prevent index offset bugs
   };
 
   // --- FIX: DETAILED ERROR LOGGING ---
@@ -131,17 +172,43 @@ export default function EditDeckPage() {
           />
         </div>
 
+        {selectedIndices.size > 0 && (
+          <div className="mb-6">
+            <button 
+              onClick={deleteSelected}
+              className="w-full py-4 bg-red-100 text-red-600 border-2 border-red-200 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-200 hover:border-red-300 transition-all"
+            >
+              Delete {selectedIndices.size} Selected Card{selectedIndices.size > 1 ? 's' : ''}
+            </button>
+          </div>
+        )}
+
         <div className="space-y-6">
           {cards?.map((card, i) => (
-            <div key={i} className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-gray-100 relative group">
+            <div 
+              key={i} 
+              className={`bg-white p-8 rounded-[2.5rem] shadow-lg border relative group transition-colors ${
+                selectedIndices.has(i) ? 'border-red-400' : 'border-gray-100'
+              }`}
+            >
+              <div className="absolute top-6 left-8 flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedIndices.has(i)}
+                  onChange={() => toggleSelection(i)}
+                  className="w-4 h-4 cursor-pointer accent-red-500"
+                />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select</span>
+              </div>
+
               <button 
                 onClick={() => removeCard(i)}
-                className="absolute top-6 right-6 text-xs font-bold text-red-300 hover:text-red-600 transition-colors"
+                className="absolute top-6 right-8 text-xs font-bold text-red-300 hover:text-red-600 transition-colors"
               >
                 Remove
               </button>
 
-              <div className="grid md:grid-cols-2 gap-6 mb-4">
+              <div className="grid md:grid-cols-2 gap-6 mb-4 mt-8">
                 <div>
                   <label className="text-[9px] font-black text-purple-400 uppercase tracking-widest block mb-1">Portuguese</label>
                   <input 
